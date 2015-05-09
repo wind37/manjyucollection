@@ -37,13 +37,13 @@ object TimerExample {
     }
   }
 
-  case class State(secondsElapsed: Long, money: Int, diff:Int, manjus: List[Manju], params: List[Parameter], makers: List[Maker])
+  case class State(secondsElapsed: Long, money: Int, diff:Int, manjus: List[Manju], resources: List[Resource], inputResources: List[Resource], makers: List[Maker])
 
-  case class Parameter(name: String, v: Int)
+  case class Resource(name: String, v: Int)
 
   type UpDownClick = (String) => Unit
 
-  val inputParameter = ReactComponentB[(Parameter, UpDownClick, UpDownClick)]("param")
+  val inputParameter = ReactComponentB[(Resource, UpDownClick, UpDownClick)]("param")
   .render(props => {
     val (p, upClick, downClick) = props
     div(
@@ -53,7 +53,7 @@ object TimerExample {
     )
   }).build
 
-  val inputParameterList = ReactComponentB[(List[Parameter], UpDownClick, UpDownClick)]("paramList")
+  val inputParameterList = ReactComponentB[(List[Resource], UpDownClick, UpDownClick)]("paramList")
     .render(props => {
     val (ps, up, down) = props
     div(cls := "")(ps map { m => inputParameter((m, up, down)) })
@@ -97,12 +97,12 @@ object TimerExample {
       }
     }
 
-    val next = State(prev.secondsElapsed + 1, prev.money, 0, prev.manjus, prev.params, newMakers)
+    val next = State(prev.secondsElapsed + 1, prev.money, 0, prev.manjus, prev.resources, prev.inputResources, newMakers)
     console.log(next.toString)
     next
   }
 
-  def makeItFrom(params: List[Parameter]):(Int, Manju) = {
+  def makeItFrom(params: List[Resource]):(Int, Manju) = {
     (60, DefaultManju())
   }
 
@@ -127,38 +127,51 @@ object TimerExample {
 
       if ( selled.isInstanceOf[DefaultManju] && selled.day > 30 ) {
         val deleted = $.state.manjus.filter { m => m.id != id }
-        $.modState(s => State(s.secondsElapsed, s.money+0, 0, deleted, s.params, s.makers))
+        $.modState(s => State(s.secondsElapsed, s.money+0, 0, deleted, s.resources, s.inputResources, s.makers))
       }
     }
 
     def upOrDown(isUp:Boolean)(n:String):Unit = {
 
-      val newOne = $.state.params.map { i =>
+      val newOne = $.state.inputResources.map { i =>
         if (i.name == n) {
           val diff = if (isUp) {
             10
           } else {
             -10
           }
-          Parameter(i.name, i.v + diff)
+          Resource(i.name, i.v + diff)
         } else {
           i
         }
       }
 
-      $.modState(s => State(s.secondsElapsed, s.money, s.diff, s.manjus, newOne, s.makers))
+      $.modState(s => State(s.secondsElapsed, s.money, s.diff, s.manjus, s.resources, newOne, s.makers))
     }
 
     def doMakeIt(id: String):Unit = {
       val newOne = $.state.makers.map { i =>
+        def okRes():Boolean = {
+          $.state.inputResources.forall(r => r.v >= $.state.resources.find(_.name == r.name).get.v)
+        }
         if (i.id == id) {
-          val (sec, m) = makeItFrom($.state.params)
+          val (sec, m) = makeItFrom($.state.inputResources)
           Maker(i.id, false, sec, m)
         } else {
           i
         }
       }
-      $.modState(s => State(s.secondsElapsed, s.money, s.diff, s.manjus, s.params, newOne))
+
+      val newRes = $.state.resources.map { r =>
+        val usedRes = $.state.inputResources.find(_.name == r.name).get
+        if ( r.v >= usedRes.v) {
+          Resource(r.name, r.v - usedRes.v)
+        } else {
+          r
+        }
+      }
+
+      $.modState(s => State(s.secondsElapsed, s.money, s.diff, s.manjus, newRes, s.inputResources, newOne))
     }
 
     def doOpenIt(id: String):Unit = {
@@ -172,7 +185,7 @@ object TimerExample {
         }
       }
 
-      $.modState(s => State(s.secondsElapsed, s.money, s.diff, s.manjus ++ List(newOne), s.params, reseted))
+      $.modState(s => State(s.secondsElapsed, s.money, s.diff, s.manjus ++ List(newOne), s.resources, s.inputResources, reseted))
     }
 
     def tick() = {
@@ -184,7 +197,8 @@ object TimerExample {
   }
 
   def initialState():State = {
-    State(0, 0, 0, Nil, List(Parameter("a", 0), Parameter("b", 0), Parameter("c", 0)), List(Maker("0", true, 0, null)))
+    val ress = List(Resource("corn", 0), Resource("water", 0), Resource("c", 0))
+    State(0, 0, 0, Nil, ress.map(i=>Resource(i.name, 1000)), ress, List(Maker("0", true, 0, null)))
   }
 
   val Timer = ReactComponentB[Unit]("Timer")
@@ -192,8 +206,9 @@ object TimerExample {
     .backend(new Backend(_))
     .render(props => {
     div( cls := "container",
-      h4(props.state.secondsElapsed + " 日目 ")//props.state.money + " yen ", " ( " + props.state.diff +" )")
-        (inputParameterList((props.state.params, props.backend.upOrDown(true), props.backend.upOrDown(false))))
+      h4(props.state.secondsElapsed + " 日目 ",
+        props.state.resources.head.v + " ", props.state.resources.take(1).head.v + " ", props.state.resources.take(2).head.v + " ")
+        (inputParameterList((props.state.inputResources, props.backend.upOrDown(true), props.backend.upOrDown(false))))
         (makerList((props.state.makers, props.backend.doMakeIt, props.backend.doOpenIt)))
         (manjuList((props.state.manjus, props.backend.onMakoClick)))
     )
