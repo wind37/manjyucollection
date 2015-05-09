@@ -37,7 +37,7 @@ object TimerExample {
     }
   }
 
-  case class State(secondsElapsed: Long, money: Int, diff:Int, manjus: List[Manju], params: List[Parameter])
+  case class State(secondsElapsed: Long, money: Int, diff:Int, manjus: List[Manju], params: List[Parameter], makers: List[Maker])
 
   case class Parameter(name: String, v: Int)
 
@@ -59,18 +59,51 @@ object TimerExample {
     div(cls := "")(ps map { m => inputParameter((m, up, down)) })
   }).build
 
+  case class Maker(id:String, isEmpty:Boolean, restSeconds: Int, becomed: Manju)
+
+  val maker = ReactComponentB[(Maker, MakoClick, MakoClick)]("maker")
+    .render(props => {
+    val (m, onMake, onOpen) = props
+    div(
+      if (m.isEmpty) {
+        div(onClick --> onMake(m.id))(div("MakeIt!"))
+      } else if (m.restSeconds == 0) {
+        div(onClick --> onOpen(m.id))(div("OpenThis!"))
+      } else {
+        div(s"00:00:${m.restSeconds}")
+      }
+    )
+  }).build
+
+  val makerList = ReactComponentB[(List[Maker], MakoClick, MakoClick)]("makoList")
+    .render(props => {
+    val (ps, make, open) = props
+    div(cls := "")(ps map { m => maker((m, make, open)) })
+  }).build
 
   type MakoClick = (String) => Unit
 
   def next(prev: State): State = {
 
-    val nextMakos = prev.manjus.flatMap {
-      case m:DefaultManju => Some(m.next)
+    // 資材が貯まる
+
+    // 工房のカウントダウン
+    val newMakers = prev.makers.map {m =>
+      if (m.isEmpty) {
+        m
+      } else {
+        val sec = if (m.restSeconds == 0) 0 else m.restSeconds - 1
+        Maker(m.id, m.isEmpty, sec, m.becomed)
+      }
     }
 
-    val next = State(prev.secondsElapsed + 1, prev.money, 0, nextMakos, prev.params)
+    val next = State(prev.secondsElapsed + 1, prev.money, 0, prev.manjus, prev.params, newMakers)
     console.log(next.toString)
     next
+  }
+
+  def makeItFrom(params: List[Parameter]):(Int, Manju) = {
+    (60, DefaultManju())
   }
 
   val manju = ReactComponentB[(Manju, MakoClick)]("manju")
@@ -94,7 +127,7 @@ object TimerExample {
 
       if ( selled.isInstanceOf[DefaultManju] && selled.day > 30 ) {
         val deleted = $.state.manjus.filter { m => m.id != id }
-        $.modState(s => State(s.secondsElapsed, s.money+0, 0, deleted, s.params))
+        $.modState(s => State(s.secondsElapsed, s.money+0, 0, deleted, s.params, s.makers))
       }
     }
 
@@ -113,26 +146,56 @@ object TimerExample {
         }
       }
 
-      $.modState(s => State(s.secondsElapsed, s.money, s.diff, s.manjus, newOne))
+      $.modState(s => State(s.secondsElapsed, s.money, s.diff, s.manjus, newOne, s.makers))
+    }
+
+    def doMakeIt(id: String):Unit = {
+      val newOne = $.state.makers.map { i =>
+        if (i.id == id) {
+          val (sec, m) = makeItFrom($.state.params)
+          Maker(i.id, false, sec, m)
+        } else {
+          i
+        }
+      }
+      $.modState(s => State(s.secondsElapsed, s.money, s.diff, s.manjus, s.params, newOne))
+    }
+
+    def doOpenIt(id: String):Unit = {
+      val newOne = $.state.makers.find(_.id == id).get.becomed
+
+      val reseted = $.state.makers.map { i =>
+        if (i.id == id) {
+          Maker(i.id, true, 0, null)
+        } else {
+          i
+        }
+      }
+
+      $.modState(s => State(s.secondsElapsed, s.money, s.diff, s.manjus ++ List(newOne), s.params, reseted))
     }
 
     def tick() = {
-      //$.modState(s => next(s))
+      $.modState(s => next(s))
     }
 
     def start() =
       interval = js.timers.setInterval(1000)(tick())
   }
 
+  def initialState():State = {
+    State(0, 0, 0, Nil, List(Parameter("a", 0), Parameter("b", 0), Parameter("c", 0)), List(Maker("0", true, 0, null)))
+  }
+
   val Timer = ReactComponentB[Unit]("Timer")
-    .initialState(State(0, 0, 0, Nil, List(Parameter("a", 0), Parameter("b", 0), Parameter("c", 0))))
+    .initialState(initialState())
     .backend(new Backend(_))
     .render(props => {
     div( cls := "container",
       h4(props.state.secondsElapsed + " 日目 ")//props.state.money + " yen ", " ( " + props.state.diff +" )")
         (inputParameterList((props.state.params, props.backend.upOrDown(true), props.backend.upOrDown(false))))
-//    (makomakoList((props.state.makos, props.backend.onMakoClick)))
-
+        (makerList((props.state.makers, props.backend.doMakeIt, props.backend.doOpenIt)))
+        (manjuList((props.state.manjus, props.backend.onMakoClick)))
     )
   })
     .componentDidMount(_.backend.start())
