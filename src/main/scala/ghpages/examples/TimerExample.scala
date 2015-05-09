@@ -18,76 +18,26 @@ object TimerExample {
   }
 
   object Param {
-    val SeimakoDay = 30
-    val KomakoWeight = 1
-    val SeimakoWeight = 30
-    val MaxmakoMaleWeight = 60
-    val MaxmakoFemaleWeight = 40
-    val WeightPercentEsa = 0.6
-    val MaxMakoDay = 120
-    // %
-    val WeightPercentPerInverseDay = 1
-    // kg (1/day*2)*this =>
-    val EsaPerWeight = 0.05
-    // kg
-    val MilkPerWeight = 0.05
-    // kg
-    val ValuePerMilkWeight = 100
-    // yen
-    val ValuePerMakoWeight = 200
-    // yen
-    val ValuePerEsaWeight = 150
-    // yen
-    val FixedCostBase = 1000
-    val TaxRate = 0.2
-    // income * this
-    val InitMoney = 100000
-    // yen
-    val SellLimitDay = 45
-    val MakoInitialValue = 5000
-    // yen
-    val LandOpenedLimit = 10
-    // if exceeds this, makomako land open
-    val LandFeePerPerson = 1000 // yen
   }
 
-  sealed trait Makomako {
+  sealed trait Manju {
     val id: String
     val day: Int
     def imgClass: String
-    def esaKg: Double = {
-      scala.math.min(day, Param.MaxmakoMaleWeight) * Param.EsaPerWeight
-    }
-    def cost: Double = esaKg * Param.ValuePerEsaWeight
   }
 
-  case class OxMako(val id:String = randId, val day: Int = 0, daysInPG: Option[Int] = None) extends Makomako {
+  case class DefaultManju(val id:String = randId, val day: Int = 0) extends Manju {
     def imgClass = day match {
       case d if d < 2 => "twa-hatching-chick"
-      case d if d > Param.MaxMakoDay - 3 => "twa-skull twa-2x"
-      case d if d > Param.SeimakoDay => "twa-ox twa-2x "
-      case _ => "twa-ox"
+      case _ => "twa-cow twa-2x "
     }
 
     def next() = {
-      OxMako(id, day + 1, daysInPG.flatMap { d => if (d == 0) None else Some(d - 1) } orElse Some(15))
+      DefaultManju(id, day + 1)
     }
   }
 
-  case class DefaultMako(val id:String = randId, val day: Int = 0) extends Makomako {
-    def imgClass = day match {
-      case d if d < 2 => "twa-hatching-chick"
-      case d if d > Param.MaxMakoDay - 3 => "twa-skull twa-2x"
-      case d if d > Param.SeimakoDay => "twa-cow twa-2x "
-      case _ => "twa-cow"
-    }
-
-    def next() = {
-      DefaultMako(id, day + 1)
-    }
-  }
-
-  case class State(secondsElapsed: Long, money: Int, diff:Int, makos: List[Makomako], params: List[Parameter])
+  case class State(secondsElapsed: Long, money: Int, diff:Int, manjus: List[Manju], params: List[Parameter])
 
   case class Parameter(name: String, v: Int)
 
@@ -114,43 +64,25 @@ object TimerExample {
 
   def next(prev: State): State = {
 
-    val newMakos = prev.makos collect {
-      case ox: OxMako if ox.daysInPG == Some(0) =>
-        val r = Random.nextInt(6)
-        0.to(r).map{ _ => DefaultMako() }  ++ (if (Random.nextInt(8) == 0) List(OxMako()) else Nil)
-    } flatten
-
-    val donadona = prev.makos filter {
-      case DefaultMako(_, d) => d == Param.SeimakoDay
-      case _ => false
-    }
-    val donaMoney = donadona.length * 100
-
-    val nextMakos = prev.makos.flatMap {
-      case OxMako(_, d, _) if d==Param.MaxMakoDay => None
-      case ox:OxMako => Some(ox.next)
-      case DefaultMako(_, d) if d==Param.MaxMakoDay => None
-      case m:DefaultMako => Some(m.next)
+    val nextMakos = prev.manjus.flatMap {
+      case m:DefaultManju => Some(m.next)
     }
 
-    val cost = prev.makos.map{m => m.cost}.sum.toInt
-
-    val diff =  - cost + donaMoney
-    val next = State(prev.secondsElapsed + 1, prev.money + diff, diff, nextMakos ++ newMakos, prev.params)
+    val next = State(prev.secondsElapsed + 1, prev.money, 0, nextMakos, prev.params)
     console.log(next.toString)
     next
   }
 
-  val makomako = ReactComponentB[(Makomako, MakoClick)]("makomako")
+  val manju = ReactComponentB[(Manju, MakoClick)]("manju")
     .render(M => {
     val (m, c) = M
     div(cls := "picture", onClick --> c(m.id))(img(cls := "twa " + m.imgClass, title := "" /*s"${m.day} days"*/))
   }).build
 
-  val makomakoList = ReactComponentB[(List[Makomako], MakoClick)]("makomakoList")
+  val manjuList = ReactComponentB[(List[Manju], MakoClick)]("manjuList")
     .render(props => {
     val (ms, c) = props
-    div(cls := "")(ms map { m => makomako((m, c)) })
+    div(cls := "")(ms map { m => manju((m, c)) })
   }).build
 
   class Backend($: BackendScope[_, State]) {
@@ -158,12 +90,11 @@ object TimerExample {
       js.undefined
 
     def onMakoClick(id: String):Unit = {
-      val selled = $.state.makos.filter{ m=> m.id == id}.head
+      val selled = $.state.manjus.filter{ m=> m.id == id}.head
 
-      if ( selled.isInstanceOf[DefaultMako] && selled.day > 30 ) {
-        val deleted = $.state.makos.filter { m => m.id != id }
-        val diff =  selled.day * Param.ValuePerMakoWeight
-        $.modState(s => State(s.secondsElapsed, s.money+diff, diff, deleted, s.params))
+      if ( selled.isInstanceOf[DefaultManju] && selled.day > 30 ) {
+        val deleted = $.state.manjus.filter { m => m.id != id }
+        $.modState(s => State(s.secondsElapsed, s.money+0, 0, deleted, s.params))
       }
     }
 
@@ -182,7 +113,7 @@ object TimerExample {
         }
       }
 
-      $.modState(s => State(s.secondsElapsed, s.money, s.diff, s.makos, newOne))
+      $.modState(s => State(s.secondsElapsed, s.money, s.diff, s.manjus, newOne))
     }
 
     def tick() = {
@@ -194,7 +125,7 @@ object TimerExample {
   }
 
   val Timer = ReactComponentB[Unit]("Timer")
-    .initialState(State(0, Param.InitMoney, 0, OxMako() :: Nil, List(Parameter("a", 0), Parameter("b", 0), Parameter("c", 0))))
+    .initialState(State(0, 0, 0, Nil, List(Parameter("a", 0), Parameter("b", 0), Parameter("c", 0))))
     .backend(new Backend(_))
     .render(props => {
     div( cls := "container",
