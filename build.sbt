@@ -1,6 +1,6 @@
 enablePlugins(ScalaJSPlugin)
 
-name := "Example"
+name := "Manju"
 
 version := "0.1-SNAPSHOT"
 
