@@ -46,11 +46,7 @@ object ReactApp extends JSApp {
     .initialState(State(0))
     .backend(new Backend(_))
     .render((P, S, B) =>
-      div(
-//        navMenu((P, B)),
         container(P(S.index))
-        // footer(hr, span(`class` := "text-center")("Powered by scalajs-react"))
-      )
     ).build
 
   def component(data: List[String]) =

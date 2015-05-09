@@ -24,6 +24,8 @@ object TimerExample {
     val id: String
     val day: Int
     def imgClass: String
+    def imgSrc: String
+    def secondsToComplete: Int
   }
 
   case class DefaultManju(val id:String = randId, val day: Int = 0) extends Manju {
@@ -32,9 +34,13 @@ object TimerExample {
       case _ => "twa-cow twa-2x "
     }
 
+    def imgSrc = "http://ecx.images-amazon.com/images/I/41IIf83jj5L.jpg"
+
     def next() = {
       DefaultManju(id, day + 1)
     }
+
+    def secondsToComplete = 30
   }
 
   case class State(secondsElapsed: Long, money: Int, diff:Int, manjus: List[Manju], resources: List[Resource], inputResources: List[Resource], makers: List[Maker])
@@ -46,17 +52,23 @@ object TimerExample {
   val inputParameter = ReactComponentB[(Resource, UpDownClick, UpDownClick)]("param")
   .render(props => {
     val (p, upClick, downClick) = props
-    div(
-    h3(p.name + ":" + p.v),
-      div(onClick --> upClick(p.name))(img(cls := "twa twa-allow-up", alt := "↑")),
-      div(onClick --> downClick(p.name))(img(cls := "twa twa-allow-down", alt := "↓"))
+    div(cls := "ui segment",
+    div(cls := "ui two column middle aligned centered grid",
+    div(cls := "center aligned column", div(cls:="ui huge header", p.name + ":" + p.v)),
+      (div(cls := "ui vertical divider")),
+    div(cls := "column",
+      div(cls := "ui vertical buttons",
+        div(cls := "ui icon button", onClick --> upClick(p.name), (i(cls := "arrow circle up icon", title := "↑")), "+10"),
+        div(cls := "ui icon button", onClick --> downClick(p.name), (i(cls := "arrow circle down icon", title := "↓")), "-10")
+      )
+    ))
     )
   }).build
 
   val inputParameterList = ReactComponentB[(List[Resource], UpDownClick, UpDownClick)]("paramList")
     .render(props => {
     val (ps, up, down) = props
-    div(cls := "")(ps map { m => inputParameter((m, up, down)) })
+    div(cls := "ui")(ps map { m => inputParameter((m, up, down)) })
   }).build
 
   case class Maker(id:String, isEmpty:Boolean, restSeconds: Int, becomed: Manju)
@@ -66,11 +78,14 @@ object TimerExample {
     val (m, onMake, onOpen) = props
     div(
       if (m.isEmpty) {
-        div(onClick --> onMake(m.id))(div("MakeIt!"))
+        div(cls := "ui button", onClick --> onMake(m.id), "作成!")
       } else if (m.restSeconds == 0) {
-        div(onClick --> onOpen(m.id))(div("OpenThis!"))
+        div(cls := "ui button", onClick --> onOpen(m.id), "開ける!")
       } else {
-        div(s"00:00:${m.restSeconds}")
+        val hour = m.restSeconds / 3600
+        val min = (m.restSeconds-(hour*3600)) / 60
+        val sec = (m.restSeconds - (hour*3600) - min * 60)
+        div("%02d:%02d:%02d".format(hour, min, sec))
       }
     )
   }).build
@@ -78,7 +93,7 @@ object TimerExample {
   val makerList = ReactComponentB[(List[Maker], MakoClick, MakoClick)]("makoList")
     .render(props => {
     val (ps, make, open) = props
-    div(cls := "")(ps map { m => maker((m, make, open)) })
+    div(cls := "ui segment")(ps map { m => maker((m, make, open)) })
   }).build
 
   type MakoClick = (String) => Unit
@@ -98,24 +113,30 @@ object TimerExample {
     }
 
     val next = State(prev.secondsElapsed + 1, prev.money, 0, prev.manjus, prev.resources, prev.inputResources, newMakers)
-    console.log(next.toString)
+    //console.log(next.toString)
     next
   }
 
   def makeItFrom(params: List[Resource]):(Int, Manju) = {
-    (60, DefaultManju())
+    val m = DefaultManju()
+    (m.secondsToComplete, m)
   }
 
   val manju = ReactComponentB[(Manju, MakoClick)]("manju")
     .render(M => {
     val (m, c) = M
-    div(cls := "picture", onClick --> c(m.id))(img(cls := "twa " + m.imgClass, title := "" /*s"${m.day} days"*/))
+    div(cls := "card",
+      div(cls := "image", onClick --> c(m.id))(img(cls:="ui small image", src := m.imgSrc)),
+      div(cls := "content small", "")
+    )
   }).build
 
   val manjuList = ReactComponentB[(List[Manju], MakoClick)]("manjuList")
     .render(props => {
     val (ms, c) = props
-    div(cls := "")(ms map { m => manju((m, c)) })
+    div(cls:="ui segment",
+    div(cls := "ui three doubling cards")(ms map { m => manju((m, c)) })
+    )
   }).build
 
   class Backend($: BackendScope[_, State]) {
@@ -197,19 +218,22 @@ object TimerExample {
   }
 
   def initialState():State = {
-    val ress = List(Resource("corn", 0), Resource("water", 0), Resource("c", 0))
-    State(0, 0, 0, Nil, ress.map(i=>Resource(i.name, 1000)), ress, List(Maker("0", true, 0, null)))
+    val ress = List(Resource("米粉", 0), Resource("水", 0), Resource("砂糖", 0), Resource("小豆", 0))
+    State(0, 0, 0, List(), ress.map(i=>Resource(i.name, 1000)), ress, List(Maker("0", true, 0, null)))
   }
 
   val Timer = ReactComponentB[Unit]("Timer")
     .initialState(initialState())
     .backend(new Backend(_))
     .render(props => {
-    div( cls := "container",
-      h4(props.state.secondsElapsed + " 日目 ",
-        props.state.resources.head.v + " ", props.state.resources.take(1).head.v + " ", props.state.resources.take(2).head.v + " ")
-        (inputParameterList((props.state.inputResources, props.backend.upOrDown(true), props.backend.upOrDown(false))))
+      div(cls := "ui segment",
+        div(cls := "ui large header",
+          props.state.resources.map(r => r.name + ":" + r.v).mkString(" ")
+        )
+          (inputParameterList((props.state.inputResources, props.backend.upOrDown(true), props.backend.upOrDown(false))))
+        (div(cls := "ui divider", "工房"))
         (makerList((props.state.makers, props.backend.doMakeIt, props.backend.doOpenIt)))
+        (div(cls := "ui divider", "手持ちのまんじゅう"))
         (manjuList((props.state.manjus, props.backend.onMakoClick)))
     )
   })
