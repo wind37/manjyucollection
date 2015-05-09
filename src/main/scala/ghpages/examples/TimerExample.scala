@@ -87,7 +87,22 @@ object TimerExample {
     }
   }
 
-  case class State(secondsElapsed: Long, money: Int, diff:Int, makos: List[Makomako])
+  case class State(secondsElapsed: Long, money: Int, diff:Int, makos: List[Makomako], param: Parameter)
+
+  case class Parameter(name: String, v: Int)
+
+  type UpDownClick = (String) => Unit
+
+  val inputParameter = ReactComponentB[(Parameter, UpDownClick, UpDownClick)]("param")
+  .render(props => {
+    val (p, upClick, downClick) = props
+    div(
+    h3(p.name + ":" + p.v),
+      div(onClick --> upClick(p.name))(img(cls := "twa twa-allow-up", alt := "↑")),
+      div(onClick --> downClick(p.name))(img(cls := "twa twa-allow-down", alt := "↓"))
+    )
+  }).build
+
 
   type MakoClick = (String) => Unit
 
@@ -115,7 +130,7 @@ object TimerExample {
     val cost = prev.makos.map{m => m.cost}.sum.toInt
 
     val diff =  - cost + donaMoney
-    val next = State(prev.secondsElapsed + 1, prev.money + diff, diff, nextMakos ++ newMakos)
+    val next = State(prev.secondsElapsed + 1, prev.money + diff, diff, nextMakos ++ newMakos, prev.param)
     console.log(next.toString)
     next
   }
@@ -142,12 +157,22 @@ object TimerExample {
       if ( selled.isInstanceOf[DefaultMako] && selled.day > 30 ) {
         val deleted = $.state.makos.filter { m => m.id != id }
         val diff =  selled.day * Param.ValuePerMakoWeight
-        $.modState(s => State(s.secondsElapsed, s.money+diff, diff, deleted))
+        $.modState(s => State(s.secondsElapsed, s.money+diff, diff, deleted, Parameter("test", 0)))
       }
     }
 
+    def upOrDown(isUp:Boolean)(v:String):Unit = {
+      val selected = $.state.param
+      val diff = if (isUp) {
+        10
+      } else {
+        -10
+      }
+      $.modState(s => State(s.secondsElapsed, s.money, s.diff, DefaultMako() :: s.makos, Parameter(s.param.name, s.param.v + diff)))
+    }
+
     def tick() = {
-      $.modState(s => next(s))
+      //$.modState(s => next(s))
     }
 
     def start() =
@@ -155,12 +180,14 @@ object TimerExample {
   }
 
   val Timer = ReactComponentB[Unit]("Timer")
-    .initialState(State(0, Param.InitMoney, 0, OxMako() :: Nil))
+    .initialState(State(0, Param.InitMoney, 0, OxMako() :: Nil, Parameter("test", 0)))
     .backend(new Backend(_))
     .render(props => {
     div( cls := "container",
       h4(props.state.secondsElapsed + " 日目 ")//props.state.money + " yen ", " ( " + props.state.diff +" )")
-    (makomakoList((props.state.makos, props.backend.onMakoClick)))
+        (inputParameter((props.state.param, props.backend.upOrDown(true), props.backend.upOrDown(false))))
+//    (makomakoList((props.state.makos, props.backend.onMakoClick)))
+
     )
   })
     .componentDidMount(_.backend.start())
