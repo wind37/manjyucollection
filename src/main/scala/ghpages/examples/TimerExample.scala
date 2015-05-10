@@ -7,7 +7,6 @@ import org.scalajs.dom.console
 
 import scala.util.Random
 
-/** Scala version of "A Stateful Component" on http://facebook.github.io/react/ */
 object TimerExample {
 
   def content = Timer()
@@ -50,25 +49,25 @@ object TimerExample {
   type UpDownClick = (String) => Unit
 
   val inputParameter = ReactComponentB[(Resource, UpDownClick, UpDownClick)]("param")
-  .render(props => {
+    .render(props => {
     val (p, upClick, downClick) = props
-    div(cls := "ui segment",
-    div(cls := "ui two column middle aligned centered grid",
-    div(cls := "center aligned column", div(cls:="ui huge header", p.name + ":" + p.v)),
-      (div(cls := "ui vertical divider")),
     div(cls := "column",
-      div(cls := "ui vertical buttons",
-        div(cls := "ui icon button", onClick --> upClick(p.name), (i(cls := "arrow circle up icon", title := "↑")), "+10"),
-        div(cls := "ui icon button", onClick --> downClick(p.name), (i(cls := "arrow circle down icon", title := "↓")), "-10")
-      )
-    ))
-    )
+      div(cls := "ui vertical divider"),
+      div(cls := "ui two column middle aligned centered grid",
+          div(cls := "center aligned column", div(cls := "ui huge right aligned header", p.name + ":" + p.v)),
+          div(cls := "column",
+            div(cls := "ui vertical buttons",
+              div(cls := "ui icon button", onClick --> upClick(p.name), (i(cls := "arrow circle up icon", title := "↑")), "+10"),
+              div(cls := "ui icon button", onClick --> downClick(p.name), (i(cls := "arrow circle down icon", title := "↓")), "-10")
+            ))))
   }).build
 
   val inputParameterList = ReactComponentB[(List[Resource], UpDownClick, UpDownClick)]("paramList")
     .render(props => {
     val (ps, up, down) = props
-    div(cls := "ui")(ps map { m => inputParameter((m, up, down)) })
+    div(cls:="ui segment",
+      div(cls := "ui two column centered grid")(ps map { m => inputParameter((m, up, down)) })
+    )
   }).build
 
   case class Maker(id:String, isEmpty:Boolean, restSeconds: Int, becomed: Manju)
@@ -76,11 +75,12 @@ object TimerExample {
   val maker = ReactComponentB[(Maker, MakoClick, MakoClick)]("maker")
     .render(props => {
     val (m, onMake, onOpen) = props
-    div(
+    div(cls:="column",
+      (div(cls := "ui vertical divider")),
       if (m.isEmpty) {
         div(cls := "ui button", onClick --> onMake(m.id), "作成!")
       } else if (m.restSeconds == 0) {
-        div(cls := "ui button", onClick --> onOpen(m.id), "開ける!")
+        div(cls := "ui button", onClick --> onOpen(m.id), "完成!")
       } else {
         val hour = m.restSeconds / 3600
         val min = (m.restSeconds-(hour*3600)) / 60
@@ -93,7 +93,9 @@ object TimerExample {
   val makerList = ReactComponentB[(List[Maker], MakoClick, MakoClick)]("makoList")
     .render(props => {
     val (ps, make, open) = props
-    div(cls := "ui segment")(ps map { m => maker((m, make, open)) })
+    div(cls := "ui segment",
+      div(cls := "ui three column middle aligned centered grid")(ps map { m => maker((m, make, open)) })
+    )
   }).build
 
   type MakoClick = (String) => Unit
@@ -227,11 +229,12 @@ object TimerExample {
     .backend(new Backend(_))
     .render(props => {
       div(cls := "ui segment",
-        div(cls := "ui large header",
+        div(cls:= "ui large left aligned header", "Lv.0 " + "あなたの名前"),
+        div(cls := "ui large right aligned header",
           props.state.resources.map(r => r.name + ":" + r.v).mkString(" ")
         )
+          (div(cls := "ui divider", "工房"))
           (inputParameterList((props.state.inputResources, props.backend.upOrDown(true), props.backend.upOrDown(false))))
-        (div(cls := "ui divider", "工房"))
         (makerList((props.state.makers, props.backend.doMakeIt, props.backend.doOpenIt)))
         (div(cls := "ui divider", "手持ちのまんじゅう"))
         (manjuList((props.state.manjus, props.backend.onMakoClick)))
