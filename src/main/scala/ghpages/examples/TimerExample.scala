@@ -78,14 +78,14 @@ object TimerExample {
     div(cls:="column",
       (div(cls := "ui vertical divider")),
       if (m.isEmpty) {
-        div(cls := "ui button", onClick --> onMake(m.id), "作成!")
+        div(cls := "ui large button", onClick --> onMake(m.id), "焼き上げ!")
       } else if (m.restSeconds == 0) {
-        div(cls := "ui button", onClick --> onOpen(m.id), "完成!")
+        div(cls := "ui large button", onClick --> onOpen(m.id), "完成!")
       } else {
         val hour = m.restSeconds / 3600
         val min = (m.restSeconds-(hour*3600)) / 60
         val sec = (m.restSeconds - (hour*3600) - min * 60)
-        div("%02d:%02d:%02d".format(hour, min, sec))
+        div(cls := "ui large", "%02d:%02d:%02d".format(hour, min, sec))
       }
     )
   }).build
